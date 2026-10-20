@@ -115,8 +115,8 @@ With only 74 fraud cases, every figure is imprecise. A rough 95% interval is abo
 ## How to run
 
 ```bash
-git clone <this-repository-url>
-cd <repository-folder>
+git clone https://github.com/ninganagoudadhannur30-web/Card_Fruad_Detection.git
+cd Credit_Card
 python -m venv venv
 venv\Scripts\activate        # Windows (macOS/Linux: source venv/bin/activate)
 pip install -r requirements.txt
