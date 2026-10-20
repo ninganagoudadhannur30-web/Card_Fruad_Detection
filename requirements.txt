@@ -3,16 +3,21 @@ pandas>=2.0
 numpy>=1.26
 matplotlib>=3.8
 seaborn>=0.13
-
-# Modeling and explanation
+ 
+# Modeling
 scikit-learn>=1.4
 xgboost>=2.0
-shap>=0.44
-
+ 
 # Notebooks
 jupyter>=1.0
 ipykernel>=6.0
-
-# API service (used when we deploy the model)
+ 
+# API service
 fastapi>=0.110
 uvicorn>=0.27
+pydantic>=2.0
+ 
+# Tests
+httpx>=0.27
+pytest>=8.0
+ 

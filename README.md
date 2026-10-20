@@ -1,6 +1,6 @@
 # Credit Card Fraud Detection
 
-A machine learning project that scores credit card transactions for fraud risk. Fraud is extremely rare in this data (about 0.17% of transactions), so the project focuses on the problems that come with imbalanced data: choosing the right metrics, validating in time order, and choosing a decision threshold.
+A machine learning project that scores credit card transactions for fraud risk. Fraud is extremely rare in this data (about 0.17% of transactions overall, and 0.13% in the test period), so the project focuses on the problems that come with imbalanced data: choosing the right metrics, validating in time order, and choosing a decision threshold.
 
 > **Learning project.** This is built on one historical, anonymized dataset and is not a production fraud system.
 
@@ -11,6 +11,8 @@ On a held-out test set of the **latest 20% of transactions** (56,746 payments, 7
 - caught **56 of 74 frauds** (recall 0.757)
 - raised **67 alerts**, of which 56 were real fraud (precision 0.836), meaning 11 false alarms among 56,672 normal payments
 - reached **PR-AUC 0.786**, against 0.0013 for a model that guesses at random
+
+The model is also served as a small FastAPI service (see [Fraud scoring API](#fraud-scoring-api)).
 
 A model that never flags anything scores 99.87% accuracy on this test set while catching zero fraud, which is why accuracy is not used to judge the models.
 
@@ -127,16 +129,20 @@ Then open the notebook in the `notebook/` folder and run all cells. Developed wi
 ## Project structure
 
 ```
+├── app/             # FastAPI service
 ├── data/            # creditcard.csv goes here (not included, download from Kaggle)
 ├── figures/         # plots used in this README
+├── model/           # saved XGBoost model and threshold
 ├── notebook/        # analysis and modeling notebook
+├── sample/          # demo transactions for the API
+├── tests/           # API tests
 ├── requirements.txt
 └── README.md
 ```
 
 ## Tech stack
 
-Python, pandas, NumPy, scikit-learn, XGBoost, matplotlib, seaborn, Jupyter
+Python, pandas, NumPy, scikit-learn, XGBoost, matplotlib, seaborn, Jupyter, FastAPI, Uvicorn, pytest
 
 ## What I learned
 
@@ -145,13 +151,59 @@ Python, pandas, NumPy, scikit-learn, XGBoost, matplotlib, seaborn, Jupyter
 - **Keep data splits separate and the roles clear.** Fit on one slice, choose things on another, and report once on the last. Even a small slip, like a mismatched label array or a mis-specified validation model, can quietly break that.
 - **A threshold is a decision, not a default.** Moving the cutoff from 0.5 changed precision and recall far more than the choice between models, and my first rule for choosing it picked a fragile edge value.
 - **Small test sets mean wide uncertainty.** I report intervals and say so instead of quoting sharp numbers.
+- **Serving a model means repeating training exactly.** The API must apply the same `log(1 + Amount)` transform and the same column order as training, or it would silently return wrong scores.
 - **Check configuration carefully.** A misspelled parameter name was silently ignored and led to a wrongly chosen threshold until I compared the validation and final models line by line.
+
+## Fraud scoring API
+
+The trained model is served with FastAPI and Uvicorn, so a transaction can be scored over HTTP instead of by running the notebook.
+
+### Run it
+
+```bash
+# 1. Run the last cell of the notebook once. It creates model/ and sample/.
+# 2. From the project root, with the virtual environment active:
+uvicorn app.main:app --reload
+```
+
+If port 8000 is busy, add `--port 8001` and use that port in the addresses below. If `uvicorn` is not recognized on Windows, use `python -m uvicorn app.main:app --reload`.
+
+Open <http://127.0.0.1:8000/docs> for an interactive page where you can try the endpoints. The `/predict` request has three ready-made examples (a normal payment, a fraud the model catches, and a fraud it misses), taken from the test set.
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Check that the service is running |
+| GET | `/model-info` | Show the decision threshold and expected features |
+| POST | `/predict` | Score one transaction |
+
+Example response from `/predict`:
+
+```json
+{"fraud_score": 0.9987, "flagged": true, "threshold": 0.754}
+```
+
+The request needs `V1` to `V28` and `Amount` (which must be 0 or more). Missing or invalid fields are rejected with a 422 error. The service applies the same `log(1 + Amount)` transform and column order used in training.
+
+### Tests
+
+```bash
+pytest
+```
+
+The tests check the health and model-info endpoints, a valid prediction, that the fraud example scores higher than the normal one, and that bad input is rejected.
+
+### Limitations of the demo
+
+- The `V1` to `V28` inputs are anonymized features, so a real user could not type them in. The demo examples are rows copied from the test set. The normal and fraud-caught examples are the most clear-cut test cases, so they look easier than a typical payment, and the model does miss some fraud (see the third example).
+- The service scores each transaction on its own, with no cardholder history, and it is a learning project, not a production system.
 
 ## Next steps
 
 - Explain predictions with SHAP (keeping in mind the anonymized features)
 - Time-aware cross-validation and hyperparameter tuning
-- Wrap the model in a FastAPI service and package it with Docker
+- Package the API with Docker
 - Add a cost-based way of choosing the threshold
 
 ## AI assistance
